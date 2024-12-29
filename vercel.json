@@ -1,11 +1,21 @@
 {
+  "version": 2,
+  "buildCommand": "curl -L https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip -o ffmpeg.zip && unzip ffmpeg.zip && mv ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe . && pip install -r requirements.txt",
   "builds": [
     {
-      "src": "package.json",
+      "src": "**/*.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "**/*.ts",
       "use": "@vercel/node"
     }
   ],
-  "hooks": {
-    "build": "bash install_ffmpeg.sh"
-  }
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/route.ts"
+    }
+  ]
+  
 }
