@@ -11,59 +11,60 @@ declare global {
   }
 }
 import { useState, useRef, useEffect } from 'react'
+import { EditDialog } from '@/components/dialog'
 import { Button } from '@/components/button'
 import { Input } from '@/components/input'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/card'
 import { Loader2, Music } from 'lucide-react'
 import { Header } from '@/components/header'
 
-async function downloadFile(url: string, filename: string) {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-
-    // Modern browsers: Use File System Access API
-    if ('showSaveFilePicker' in window) {
-      try {
-        const handle = await window.showSaveFilePicker({
-          suggestedName: filename,
-          types: [{
-            description: 'MP3 Audio File',
-            accept: {'audio/mpeg': ['.mp3']},
-          }],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return;
-      } catch (err) {
-        if (err instanceof Error && err.name !== 'AbortError') {
-          // Fall back to traditional download if user didn't just cancel
-          console.log('Falling back to traditional download');
-        }
-      }
-    }
-
-    // Fallback for browsers without File System Access API
-    const blobUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(blobUrl);
-  } catch (error) {
-    console.error('Download failed:', error);
-  }
-}
-
 export default function Home() {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [isConverting, setIsConverting] = useState(false)
-  const [downloadUrl, setDownloadUrl] = useState('')
+  const [downloadUrl, setDownloadUrl] = useState<string>('')
   const [videoTitle, setVideoTitle] = useState('')
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  async function downloadFile(url: string, filename: string) {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+
+      // Modern browsers: Use File System Access API
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{
+              description: 'MP3 Audio File',
+              accept: {'audio/mpeg': ['.mp3']},
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return;
+        } catch (err) {
+          if (err instanceof Error && err.name !== 'AbortError') {
+            // Fall back to traditional download if user didn't just cancel
+            console.log('Falling back to traditional download');
+          }
+        }
+      }
+
+      // Fallback for browsers without File System Access API
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  }
 
   const handleCancel = () => {
     if (abortControllerRef.current) {
@@ -158,6 +159,8 @@ export default function Home() {
     setVideoTitle(''); // Add this line
   };
 
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -222,15 +225,30 @@ export default function Home() {
                   </a>
                   <Button
                     type="button"
+                    onClick={() => setIsEditDialogOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    Edit MP3
+                  </Button>
+                  <Button
+                    type="button"
                     onClick={handleConvertAnother}
                     className="bg-green-600 hover:bg-green-700 transition-colors text-sm"
                   >
                     Convert Another
                   </Button>
                 </div>
+                <EditDialog
+                  isOpen={isEditDialogOpen}
+                  onClose={() => setIsEditDialogOpen(false)}
+                  initialFileName={videoTitle}
+                  downloadUrl={downloadUrl}
+                  onUpdate={setDownloadUrl}
+                />
               </div>
             )}
           </CardContent>
+          
           <CardFooter className="border-t border-green-100 justify-center">
             <p className="text-sm text-gray-600">Enter a valid YouTube link to convert it to MP3</p>
           </CardFooter>
