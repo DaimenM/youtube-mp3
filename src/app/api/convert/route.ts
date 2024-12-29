@@ -1,6 +1,7 @@
 //import type { NextApiRequest, NextApiResponse } from 'next'
 import { spawn } from 'child_process'
 import path from 'path'
+import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
   const { url } = await req.json()
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
       if (output.startsWith('Download URL:')) {
         const downloadUrl = output.split(':')[1].trim()
         resolve(new Response(JSON.stringify({ downloadUrl })))
+        return NextResponse.json({success:true})
       }
     })
 
