@@ -12,7 +12,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const pythonScriptPath = path.join(process.cwd(), 'src', 'scripts', 'conversion.py')
-    const pythonProcess = spawn('python', [pythonScriptPath, url])
+    const pythonProcess = spawn('/var/lang/bin/python', [pythonScriptPath, url])
 
     return new Promise<Response>((resolve, reject) => {
       let title = ''
