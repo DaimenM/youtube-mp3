@@ -6,6 +6,24 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Loader2, Music } from 'lucide-react'
 import { Header } from '@/components/header'
 
+async function downloadFile(url: string, filename: string) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error('Download failed:', error);
+  }
+}
+
 export default function Home() {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [isConverting, setIsConverting] = useState(false)
@@ -100,9 +118,13 @@ export default function Home() {
               <div className="mt-6 space-y-4">
                 <div className="flex justify-center items-center gap-4">
                   <a 
-                    href={downloadUrl} 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const filename = downloadUrl.split('/').pop()?.split('?')[0] || 'audio.mp3';
+                      downloadFile(downloadUrl, filename);
+                    }}
                     className="inline-flex items-center space-x-2 text-green-600 hover:text-green-700 font-medium"
-                    download
                   >
                     <Music className="h-4 w-4" />
                     <span>Download MP3</span>
