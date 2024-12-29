@@ -12,6 +12,10 @@ export async function POST(request: Request) {
     await del(url);
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
+    console.error('Cleanup error:', error);
+    return NextResponse.json({ 
+      error: 'Cleanup failed',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
