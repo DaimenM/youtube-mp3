@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/button'
 import { Input } from '@/components/input'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/card'
@@ -70,6 +70,57 @@ export default function Home() {
     }
   }
 
+  // Add effect to cleanup on unmount
+  useEffect(() => {
+    // Cleanup function for page unload
+    const handleUnload = async () => {
+      if (downloadUrl) {
+        // Send sync request on unload
+        navigator.sendBeacon('/api/convert/cleanup', JSON.stringify({ url: downloadUrl }));
+      }
+    };
+
+    // Add unload listener
+    window.addEventListener('beforeunload', handleUnload);
+
+    // Cleanup on component unmount
+    return () => {
+      if (downloadUrl) {
+        deleteBlob(downloadUrl);
+      }
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [downloadUrl]);
+
+  // Add delete function
+  const deleteBlob = async (url: string) => {
+    try {
+      const response = await fetch('/api/convert', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to delete blob');
+      }
+      
+      console.log('Blob deleted successfully:', url);
+    } catch (error) {
+      console.error('Failed to delete blob:', error);
+    }
+  };
+
+  // Modify the Convert Another button click handler
+  const handleConvertAnother = async () => {
+    if (downloadUrl) {
+      await deleteBlob(downloadUrl);
+    }
+    setYoutubeUrl('');
+    setDownloadUrl('');
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -131,10 +182,7 @@ export default function Home() {
                   </a>
                   <Button
                     type="button"
-                    onClick={() => {
-                      setYoutubeUrl('');
-                      setDownloadUrl('');
-                    }}
+                    onClick={handleConvertAnother}
                     className="bg-green-600 hover:bg-green-700 transition-colors text-sm"
                   >
                     Convert Another

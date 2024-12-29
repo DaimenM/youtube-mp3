@@ -1,7 +1,7 @@
 import { spawn } from 'child_process'
 import path from 'path'
 import { NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
+import { put, del } from '@vercel/blob'
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -70,3 +70,30 @@ export async function POST(request: Request): Promise<Response> {
     }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+    try {
+      const { url } = await request.json();
+      
+      if (!url) {
+        return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+      }
+  
+      // Validate if it's a valid blob URL
+      if (!url.includes('blob.vercel-storage.com')) {
+        return NextResponse.json({ error: 'Invalid blob URL' }, { status: 400 });
+      }
+  
+      console.log('Attempting to delete blob:', url);
+      await del(url);
+      console.log('Successfully deleted blob:', url);
+  
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error('Blob deletion error:', error);
+      return NextResponse.json({ 
+        error: 'Failed to delete blob',
+        details: error instanceof Error ? error.message : String(error) 
+      }, { status: 500 });
+    }
+  }
