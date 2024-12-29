@@ -1,0 +1,131 @@
+"use client";
+import { useState, useRef } from 'react'
+import { Button } from '@/components/button'
+import { Input } from '@/components/input'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/card'
+import { Loader2, Music } from 'lucide-react'
+import { Header } from '@/components/header'
+
+export default function Home() {
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [isConverting, setIsConverting] = useState(false)
+  const [downloadUrl, setDownloadUrl] = useState('')
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      setIsConverting(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsConverting(true)
+    setDownloadUrl('')
+
+    try {
+      abortControllerRef.current = new AbortController()
+      const response = await fetch('/api/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: youtubeUrl }),
+        signal: abortControllerRef.current.signal
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setDownloadUrl(data.downloadUrl)
+      } else {
+        console.error('Conversion failed')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Conversion cancelled')
+      } else {
+        console.error('Error:', error)
+      }
+    } finally {
+      setIsConverting(false)
+      abortControllerRef.current = null
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Header />
+      <main className="container mx-auto px-4 py-12">
+        <Card className="w-full max-w-md mx-auto shadow-xl border-green-100 border">
+          <CardHeader className="border-b border-green-100">
+            <CardTitle className="text-xl text-green-700">Convert Video</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                type="text"
+                placeholder="Enter YouTube video URL"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                required
+                className="border-green-200 focus:ring-green-500 focus:border-green-500"
+              />
+              <div className="flex gap-2">
+                <Button 
+                  type="submit" 
+                  className="flex-1 bg-green-600 hover:bg-green-700 transition-colors" 
+                  disabled={isConverting}
+                >
+                  {isConverting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Converting...
+                    </span>
+                  ) : (
+                    "Convert to MP3"
+                  )}
+                </Button>
+                {isConverting && (
+                  <Button 
+                    type="button"
+                    onClick={handleCancel}
+                    className="bg-red-600 hover:bg-red-700 transition-colors"
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+            {downloadUrl && (
+              <div className="mt-6 space-y-4">
+                <div className="flex justify-center items-center gap-4">
+                  <a 
+                    href={downloadUrl} 
+                    className="inline-flex items-center space-x-2 text-green-600 hover:text-green-700 font-medium"
+                    download
+                  >
+                    <Music className="h-4 w-4" />
+                    <span>Download MP3</span>
+                  </a>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setYoutubeUrl('');
+                      setDownloadUrl('');
+                    }}
+                    className="bg-green-600 hover:bg-green-700 transition-colors text-sm"
+                  >
+                    Convert Another
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="border-t border-green-100 justify-center">
+            <p className="text-sm text-gray-600">Enter a valid YouTube link to convert it to MP3</p>
+          </CardFooter>
+        </Card>
+      </main>
+    </div>
+  )
+}
