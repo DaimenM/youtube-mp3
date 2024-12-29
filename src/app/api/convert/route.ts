@@ -12,7 +12,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const pythonScriptPath = path.join(process.cwd(), 'src', 'scripts', 'conversion.py')
-    const pythonProcess = spawn('/var/lang/bin/python3', [pythonScriptPath, url])
+    const pythonProcess = spawn('python', [pythonScriptPath, url])
 
     return new Promise<Response>((resolve, reject) => {
       let title = ''
@@ -43,7 +43,10 @@ export async function POST(request: Request): Promise<Response> {
               contentType: 'audio/mpeg'
             })
             console.log('Uploaded to blob:', blob.url)
-            resolve(NextResponse.json({ downloadUrl: blob.url }))
+            resolve(NextResponse.json({ 
+              downloadUrl: blob.url,
+              videoTitle: title  // Add this line
+            }))
           } catch (error) {
             console.error('Blob upload error:', error)
             resolve(NextResponse.json({ 

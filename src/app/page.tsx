@@ -62,6 +62,7 @@ export default function Home() {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [isConverting, setIsConverting] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState('')
+  const [videoTitle, setVideoTitle] = useState('')
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const handleCancel = () => {
@@ -89,6 +90,7 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json()
         setDownloadUrl(data.downloadUrl)
+        setVideoTitle(data.videoTitle) // Update this line
       } else {
         console.error('Conversion failed')
       }
@@ -153,6 +155,7 @@ export default function Home() {
     }
     setYoutubeUrl('');
     setDownloadUrl('');
+    setVideoTitle(''); // Add this line
   };
 
   return (
@@ -201,6 +204,9 @@ export default function Home() {
             </form>
             {downloadUrl && (
               <div className="mt-6 space-y-4">
+                <p className="text-center text-lg text-gray-800 font-semibold break-words">
+                  {videoTitle}
+                </p>
                 <div className="flex justify-center items-center gap-4">
                   <a 
                     href="#"
