@@ -1,4 +1,15 @@
 "use client";
+declare global {
+  interface Window {
+    showSaveFilePicker: (options?: {
+      suggestedName?: string;
+      types?: Array<{
+        description: string;
+        accept: Record<string, string[]>;
+      }>;
+    }) => Promise<FileSystemFileHandle>;
+  }
+}
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/button'
 import { Input } from '@/components/input'
@@ -10,8 +21,31 @@ async function downloadFile(url: string, filename: string) {
   try {
     const response = await fetch(url);
     const blob = await response.blob();
+
+    // Modern browsers: Use File System Access API
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{
+            description: 'MP3 Audio File',
+            accept: {'audio/mpeg': ['.mp3']},
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          // Fall back to traditional download if user didn't just cancel
+          console.log('Falling back to traditional download');
+        }
+      }
+    }
+
+    // Fallback for browsers without File System Access API
     const blobUrl = window.URL.createObjectURL(blob);
-    
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = filename;
