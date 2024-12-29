@@ -3,6 +3,8 @@ import path from 'path'
 import { NextResponse } from 'next/server'
 import { put, del } from '@vercel/blob'
 
+export const runtime = 'edge' // Add Edge Runtime
+
 export async function POST(request: Request): Promise<Response> {
   try {
     const { url } = await request.json()
@@ -11,8 +13,15 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'YouTube URL is required' }, { status: 400 })
     }
 
+    // Use absolute path for Python executable
+    const pythonPath = process.env.PYTHON_PATH || 'python3'
     const pythonScriptPath = path.join(process.cwd(), 'src', 'scripts', 'conversion.py')
-    const pythonProcess = spawn('python', [pythonScriptPath, url])
+    
+    // Add error handling for Python process
+    const pythonProcess = spawn(pythonPath, [pythonScriptPath, url], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true
+    })
 
     return new Promise<Response>((resolve, reject) => {
       let title = ''
