@@ -22,10 +22,8 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
   const [artistName, setArtistName] = useState("")
   const [albumName, setAlbumName] = useState("")
   const [coverArt, setCoverArt] = useState<File | null>(null)
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     const formData = new FormData()
     formData.append("fileName", fileName)
     formData.append("artistName", artistName)
@@ -34,7 +32,6 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
     if (coverArt) {
       formData.append("coverArt", coverArt)
     }
-
     try {
       // Update the endpoint to match the route.ts file
       const response = await fetch("/api/edit", {

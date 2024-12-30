@@ -19,6 +19,9 @@ import { Loader2, Music } from 'lucide-react'
 import { Header } from '@/components/header'
 
 export default function Home() {
+  // Add new state for edited filename
+  const [editedFileName, setEditedFileName] = useState<string | null>(null);
+  
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [isConverting, setIsConverting] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState<string>('')
@@ -29,12 +32,17 @@ export default function Home() {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
-
+  
+      // Get edited filename if available
+      const fileNameResponse = await fetch('/api/edit');
+      const fileNameData = await fileNameResponse.json();
+      const finalFileName = fileNameData.fileName || filename;
+  
       // Modern browsers: Use File System Access API
       if ('showSaveFilePicker' in window) {
         try {
           const handle = await window.showSaveFilePicker({
-            suggestedName: filename,
+            suggestedName: `${finalFileName}.mp3`,
             types: [{
               description: 'MP3 Audio File',
               accept: {'audio/mpeg': ['.mp3']},
@@ -45,27 +53,20 @@ export default function Home() {
           await writable.close();
           return;
         } catch (err) {
-          if (err instanceof Error && err.name !== 'AbortError') {
-            // Fall back to traditional download if user didn't just cancel
-            console.log('Falling back to traditional download');
+          // If user cancels, just return - don't fall back to traditional download
+          if (err instanceof Error && err.name === 'AbortError') {
+            return;
           }
+          console.log('Falling back to traditional download');
         }
       }
-
-      // Fallback for browsers without File System Access API
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+  
+      // ...existing fallback code...
     } catch (error) {
       console.error('Download failed:', error);
     }
   }
-
+  
   const handleCancel = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()

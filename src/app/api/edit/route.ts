@@ -5,6 +5,12 @@ import fs from 'fs'
 import os from 'os'
 import { put } from '@vercel/blob'
 
+let lastEditedFileName: string | null = null;
+
+export async function GET() {
+  return NextResponse.json({ fileName: lastEditedFileName || null })
+}
+
 export async function POST(request: Request): Promise<Response> {
   try {
     const formData = await request.formData()
@@ -19,6 +25,9 @@ export async function POST(request: Request): Promise<Response> {
       artistName: formData.get('artistName'),
       albumName: formData.get('albumName'),
     }
+
+    // Store the fileName for GET requests
+    lastEditedFileName = metadata.fileName?.toString() || null;
 
     // Download the MP3 file
     const response = await fetch(downloadUrl)
