@@ -36,8 +36,9 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
     }
 
     try {
-      const response = await fetch("/api/edit-mp3", {
-        method: "POST",
+      // Update the endpoint to match the route.ts file
+      const response = await fetch("/api/edit", {
+        method: "POST", 
         body: formData,
       })
 
@@ -47,6 +48,8 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
           onUpdate(data.downloadUrl)
         }
         onClose()
+      } else {
+        console.error("Failed to edit MP3:", await response.json())
       }
     } catch (error) {
       console.error("Failed to update MP3:", error)
