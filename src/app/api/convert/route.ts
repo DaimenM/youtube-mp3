@@ -16,7 +16,7 @@ export async function POST(request: Request): Promise<Response> {
     const pythonScriptPath = path.join(process.cwd(), 'src', 'scripts', 'conversion.py')
     
     // Add error handling for Python process
-    const pythonProcess = spawn('python3', [pythonScriptPath, url], {
+    const pythonProcess = spawn('python', [pythonScriptPath, url], {
       env: { ...process.env, PYTHONPATH: process.cwd() }
     })
     return new Promise<Response>((resolve, reject) => {
