@@ -78,6 +78,7 @@ export async function POST(request: Request): Promise<Response> {
               downloadUrl: blob.url 
             }))
           } catch (error) {
+            console.error('Blob upload error:', error)
             resolve(NextResponse.json({ error: 'Failed to upload edited MP3' }, { status: 500 }))
           }
         } else {

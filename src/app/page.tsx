@@ -20,7 +20,6 @@ import { Header } from '@/components/header'
 
 export default function Home() {
   // Add new state for edited filename
-  const [editedFileName, setEditedFileName] = useState<string | null>(null);
   
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [isConverting, setIsConverting] = useState(false)
@@ -66,7 +65,7 @@ export default function Home() {
       console.error('Download failed:', error);
     }
   }
-  
+
   const handleCancel = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
