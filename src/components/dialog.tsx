@@ -1,14 +1,15 @@
 import { Dialog as DialogPrimitive, DialogContent, DialogTitle } from "@radix-ui/react-dialog"
 import { Button } from "./button"
-
-const DialogHeader = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex flex-col space-y-1.5 text-center sm:text-left">
-    {children}
-  </div>
-)
 import { Input } from "./input"
 import { Label } from "@radix-ui/react-label"
 import { useState } from "react"
+import { cn } from "@/lib/utils"
+
+const DialogHeader = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex flex-col space-y-1.5 text-center sm:text-left border-b border-green-100 pb-4">
+    {children}
+  </div>
+)
 
 interface EditDialogProps {
   isOpen: boolean;
@@ -55,50 +56,75 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
 
   return (
     <DialogPrimitive open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className={cn(
+        "bg-white rounded-lg border border-green-100 shadow-xl",
+        "p-6 w-full max-w-md mx-auto"
+      )}>
         <DialogHeader>
-          <DialogTitle>Edit MP3 Metadata</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-green-700">Edit MP3 Metadata</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="fileName">File Name (required)</Label>
+        <form onSubmit={handleSubmit} className="space-y-5 pt-4">
+          <div className="space-y-2">
+            <Label htmlFor="fileName" className="text-sm font-medium text-gray-700">
+              File Name (required)
+            </Label>
             <Input
               id="fileName"
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
               required
+              className="border-green-200 focus:ring-green-500 focus:border-green-500"
             />
           </div>
-          <div>
-            <Label htmlFor="artistName">Artist Name</Label>
+          <div className="space-y-2">
+            <Label htmlFor="artistName" className="text-sm font-medium text-gray-700">
+              Artist Name
+            </Label>
             <Input
               id="artistName"
               value={artistName}
               onChange={(e) => setArtistName(e.target.value)}
+              className="border-green-200 focus:ring-green-500 focus:border-green-500"
             />
           </div>
-          <div>
-            <Label htmlFor="albumName">Album Name</Label>
+          <div className="space-y-2">
+            <Label htmlFor="albumName" className="text-sm font-medium text-gray-700">
+              Album Name
+            </Label>
             <Input
               id="albumName"
               value={albumName}
               onChange={(e) => setAlbumName(e.target.value)}
+              className="border-green-200 focus:ring-green-500 focus:border-green-500"
             />
           </div>
-          <div>
-            <Label htmlFor="coverArt">Cover Art</Label>
+          <div className="space-y-2">
+            <Label htmlFor="coverArt" className="text-sm font-medium text-gray-700">
+              Cover Art
+            </Label>
             <Input
               id="coverArt"
               type="file"
               accept="image/jpeg,image/png"
               onChange={(e) => setCoverArt(e.target.files?.[0] || null)}
+              className="border-green-200 focus:ring-green-500 focus:border-green-500"
             />
           </div>
-          <div className="flex justify-end space-x-2 mt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex justify-end space-x-3 pt-4 border-t border-green-100">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose}
+              className="border-green-200 text-green-700 hover:bg-green-50"
+            >
               Cancel
             </Button>
-            <Button type="submit">Confirm</Button>
+            <Button 
+              type="submit"
+              className="bg-green-600 hover:bg-green-700 transition-colors"
+            >
+              Save Changes
+            </Button>
           </div>
         </form>
       </DialogContent>
