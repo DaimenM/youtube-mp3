@@ -17,7 +17,6 @@ export async function POST(request: Request): Promise<Response> {
     
     // Add error handling for Python process
     const pythonProcess = spawn('python', [pythonScriptPath, url], {
-      env: { ...process.env, PYTHONPATH: process.cwd() }
     })
     return new Promise<Response>((resolve, reject) => {
       let title = ''

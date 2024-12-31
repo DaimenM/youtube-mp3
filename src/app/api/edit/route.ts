@@ -55,8 +55,6 @@ export async function POST(request: Request): Promise<Response> {
       tempMp3Path,
       JSON.stringify(metadata)
     ], {
-      env: { ...process.env, PYTHONPATH: process.cwd()
-    }
   })
 
     return new Promise((resolve) => {
