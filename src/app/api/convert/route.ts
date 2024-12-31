@@ -13,10 +13,10 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // Use absolute path for Python executable
-    const pythonScriptPath = path.join(process.cwd(), 'src', 'scripts', 'conversion.py')
+    const pythonScriptPath = path.join('src', 'scripts', 'conversion.py')
     
     // Add error handling for Python process
-    const pythonProcess = spawn('/var/lang/bin/python3', [pythonScriptPath, url], {
+    const pythonProcess = spawn('python', [pythonScriptPath, url], {
     })
     return new Promise<Response>((resolve, reject) => {
       let title = ''
