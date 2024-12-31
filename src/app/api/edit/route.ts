@@ -50,11 +50,14 @@ export async function POST(request: Request): Promise<Response> {
 
     // Run Python script
     const pythonScriptPath = path.join(process.cwd(), 'src', 'scripts', 'edit_mp3.py')
-    const pythonProcess = spawn('python', [
+    const pythonProcess = spawn('python3', [
       pythonScriptPath,
       tempMp3Path,
       JSON.stringify(metadata)
-    ])
+    ], {
+      env: { ...process.env, PYTHONPATH: process.cwd()
+    }
+  })
 
     return new Promise((resolve) => {
       pythonProcess.on('close', async (code) => {
