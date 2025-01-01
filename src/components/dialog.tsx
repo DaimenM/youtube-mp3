@@ -2,7 +2,7 @@ import { Dialog as DialogPrimitive, DialogContent, DialogTitle } from "@radix-ui
 import { Button } from "./button"
 import { Input } from "./input"
 import { Label } from "@radix-ui/react-label"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 
 const DialogHeader = ({ children }: { children: React.ReactNode }) => (
@@ -23,8 +23,30 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
   const [artistName, setArtistName] = useState("")
   const [albumName, setAlbumName] = useState("")
   const [coverArt, setCoverArt] = useState<File | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setError(null)
+      // Fetch current metadata
+      fetch("/api/edit")
+        .then(res => res.json())
+        .then(data => {
+          if (data.fileName) {
+            setFileName(data.fileName)
+          }
+        })
+        .catch(console.error)
+    }
+  }, [isOpen])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
     const formData = new FormData()
     formData.append("fileName", fileName)
     formData.append("artistName", artistName)
@@ -33,24 +55,26 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
     if (coverArt) {
       formData.append("coverArt", coverArt)
     }
+
     try {
-      // Update the endpoint to match the route.ts file
       const response = await fetch("/api/edit", {
-        method: "POST", 
+        method: "POST",
         body: formData,
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.downloadUrl) {
-          onUpdate(data.downloadUrl)
-        }
+      const data = await response.json()
+
+      if (response.ok && data.downloadUrl) {
+        onUpdate(data.downloadUrl)
         onClose()
       } else {
-        console.error("Failed to edit MP3:", await response.json())
+        setError(data.error || "Failed to edit MP3")
       }
     } catch (error) {
+      setError("Network error occurred")
       console.error("Failed to update MP3:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -63,10 +87,15 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-green-700">Edit MP3 Metadata</DialogTitle>
         </DialogHeader>
+        {error && (
+          <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4">
+            {error}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-5 pt-4">
           <div className="space-y-2">
             <Label htmlFor="fileName" className="text-sm font-medium text-gray-700">
-              File Name (required)
+              Song Name (required)
             </Label>
             <Input
               id="fileName"
@@ -115,15 +144,20 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
               type="button" 
               variant="outline" 
               onClick={onClose}
+              disabled={isLoading}
               className="border-green-200 text-green-700 hover:bg-green-50"
             >
               Cancel
             </Button>
             <Button 
               type="submit"
-              className="bg-green-600 hover:bg-green-700 transition-colors"
+              disabled={isLoading}
+              className={cn(
+                "bg-green-600 hover:bg-green-700 transition-colors",
+                isLoading && "opacity-50 cursor-not-allowed"
+              )}
             >
-              Save Changes
+              {isLoading ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>

@@ -7,8 +7,12 @@ import { put } from '@vercel/blob'
 
 let lastEditedFileName: string | null = null;
 
+// Add these fields to the GET response
 export async function GET() {
-  return NextResponse.json({ fileName: lastEditedFileName || null })
+  return NextResponse.json({
+    fileName: lastEditedFileName || null,
+    success: true
+  })
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -76,19 +80,29 @@ export async function POST(request: Request): Promise<Response> {
 
             resolve(NextResponse.json({ 
               success: true,
-              downloadUrl: blob.url 
+              downloadUrl: blob.url,
+              fileName: metadata.fileName,
+              artistName: metadata.artistName,
+              albumName: metadata.albumName
             }))
           } catch (error) {
             console.error('Blob upload error:', error)
-            resolve(NextResponse.json({ error: 'Failed to upload edited MP3' }, { status: 500 }))
+            resolve(NextResponse.json({ 
+              success: false, 
+              error: 'Failed to upload edited MP3' 
+            }, { status: 500 }))
           }
         } else {
-          resolve(NextResponse.json({ error: 'Failed to edit MP3' }, { status: 500 }))
+          resolve(NextResponse.json({ 
+            success: false, 
+            error: 'Failed to edit MP3' 
+          }, { status: 500 }))
         }
       })
     })
   } catch (error) {
     return NextResponse.json({ 
+      success: false,
       error: 'Error processing request',
       details: error instanceof Error ? error.message : String(error)
     }, { status: 500 })
