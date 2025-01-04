@@ -2,8 +2,6 @@ import { spawn } from 'child_process'
 import path from 'path'
 import { NextResponse } from 'next/server'
 import { put, del } from '@vercel/blob'
-
-
 export async function POST(request: Request): Promise<Response> {
   try {
     const { url } = await request.json()

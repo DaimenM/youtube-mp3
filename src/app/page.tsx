@@ -33,7 +33,7 @@ export default function Home() {
       const blob = await response.blob();
   
       // Get edited filename if available
-      const fileNameResponse = await fetch('/api/edit');
+      const fileNameResponse = await fetch('https://youtube-mp3-rtyf.onrender.com/api/edit');
       const fileNameData = await fileNameResponse.json();
       const finalFileName = fileNameData.fileName || filename;
   
@@ -81,7 +81,7 @@ export default function Home() {
 
     try {
       abortControllerRef.current = new AbortController()
-      const response = await fetch('/api/convert', {
+      const response = await fetch('https://youtube-mp3-rtyf.onrender.com/api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: youtubeUrl }),
@@ -132,7 +132,7 @@ export default function Home() {
   // Add delete function
   const deleteBlob = async (url: string) => {
     try {
-      const response = await fetch('/api/convert', {
+      const response = await fetch('https://youtube-mp3-rtyf.onrender.com/api/convert', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })

@@ -1,7 +1,5 @@
 {
   "/page": "app/page.js",
   "/api/convert/route": "app/api/convert/route.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/api/edit/route": "app/api/edit/route.js",
-  "/_not-found/page": "app/_not-found/page.js"
+  "/api/edit/route": "app/api/edit/route.js"
 }
