@@ -12,7 +12,13 @@ export async function GET() {
   return NextResponse.json({
     fileName: lastEditedFileName || null,
     success: true
-  })
+  }, {
+    headers: {
+      'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    }
+  });
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -58,8 +64,7 @@ export async function POST(request: Request): Promise<Response> {
       pythonScriptPath,
       tempMp3Path,
       JSON.stringify(metadata)
-    ], {
-  })
+    ])
 
     return new Promise<Response>((resolve, reject) => {
       pythonProcess.on('close', async (code) => {
@@ -86,7 +91,7 @@ export async function POST(request: Request): Promise<Response> {
               albumName: metadata.albumName
             }, {
               headers: {
-                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization'
               }
@@ -99,7 +104,7 @@ export async function POST(request: Request): Promise<Response> {
             }, { 
               status: 500,
               headers: {
-                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization'
               }
@@ -112,7 +117,7 @@ export async function POST(request: Request): Promise<Response> {
           }, { 
             status: 500,
             headers: {
-              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
               'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
               'Access-Control-Allow-Headers': 'Content-Type, Authorization'
             }
@@ -133,7 +138,7 @@ export async function POST(request: Request): Promise<Response> {
     }, {
       status: 500,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization'
       }
@@ -147,7 +152,7 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     },

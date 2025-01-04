@@ -8,7 +8,7 @@ export async function GET() {
     success: true
   }, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     }
@@ -23,12 +23,9 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'YouTube URL is required' }, { status: 400 })
     }
 
-    // Use absolute path for Python executable
     const pythonScriptPath = path.join(process.cwd(),'src', 'scripts', 'conversion.py')
-    
-    // Add error handling for Python process
-    const pythonProcess = spawn('python', [pythonScriptPath, url], {
-    })
+    const pythonProcess = spawn('python', [pythonScriptPath, url])
+
     return new Promise<Response>((resolve, reject) => {
       let title = ''
       const chunks: Buffer[] = []
@@ -60,8 +57,8 @@ export async function POST(request: Request): Promise<Response> {
             console.log('Uploaded to blob:', blob.url)
             const metadata = {
               fileName: title,
-              artistName: '',  // Add actual artist name if available
-              albumName: ''    // Add actual album name if available
+              artistName: '',
+              albumName: ''
             }
             resolve(NextResponse.json({ 
               success: true,
@@ -71,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
               albumName: metadata.albumName
             }, {
               headers: {
-                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization'
               }
@@ -84,7 +81,7 @@ export async function POST(request: Request): Promise<Response> {
             }, {
               status: 500,
               headers: {
-                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization'
               }
@@ -97,7 +94,7 @@ export async function POST(request: Request): Promise<Response> {
           }, {
             status: 500,
             headers: {
-              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
               'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
               'Access-Control-Allow-Headers': 'Content-Type, Authorization'
             }
@@ -119,7 +116,7 @@ export async function POST(request: Request): Promise<Response> {
     }, {
       status: 500,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization'
       }
@@ -128,37 +125,49 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request) {
-    try {
-      const { url } = await request.json();
-      
-      if (!url) {
-        return NextResponse.json({ error: 'URL is required' }, { status: 400 });
-      }
-  
-      // Validate if it's a valid blob URL
-      if (!url.includes('blob.vercel-storage.com')) {
-        return NextResponse.json({ error: 'Invalid blob URL' }, { status: 400 });
-      }
-  
-      console.log('Attempting to delete blob:', url);
-      await del(url);
-      console.log('Successfully deleted blob:', url);
-  
-      return NextResponse.json({ success: true });
-    } catch (error) {
-      console.error('Blob deletion error:', error);
-      return NextResponse.json({ 
-        error: 'Failed to delete blob',
-        details: error instanceof Error ? error.message : String(error) 
-      }, { status: 500 });
+  try {
+    const { url } = await request.json();
+    
+    if (!url) {
+      return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
+
+    if (!url.includes('blob.vercel-storage.com')) {
+      return NextResponse.json({ error: 'Invalid blob URL' }, { status: 400 });
+    }
+
+    console.log('Attempting to delete blob:', url);
+    await del(url);
+    console.log('Successfully deleted blob:', url);
+
+    return NextResponse.json({ success: true }, {
+      headers: {
+        'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
+    });
+  } catch (error) {
+    console.error('Blob deletion error:', error);
+    return NextResponse.json({ 
+      error: 'Failed to delete blob',
+      details: error instanceof Error ? error.message : String(error) 
+    }, { 
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
+    });
   }
+}
 
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     },
