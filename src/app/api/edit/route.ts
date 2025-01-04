@@ -61,7 +61,7 @@ export async function POST(request: Request): Promise<Response> {
     ], {
   })
 
-    return new Promise((resolve) => {
+    return new Promise<Response>((resolve, reject) => {
       pythonProcess.on('close', async (code) => {
         if (code === 0) {
           try {
@@ -84,27 +84,82 @@ export async function POST(request: Request): Promise<Response> {
               fileName: metadata.fileName,
               artistName: metadata.artistName,
               albumName: metadata.albumName
+            }, {
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+              }
             }))
           } catch (error) {
             console.error('Blob upload error:', error)
             resolve(NextResponse.json({ 
               success: false, 
               error: 'Failed to upload edited MP3' 
-            }, { status: 500 }))
+            }, { 
+              status: 500,
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+              }
+            }))
           }
         } else {
           resolve(NextResponse.json({ 
             success: false, 
             error: 'Failed to edit MP3' 
-          }, { status: 500 }))
+          }, { 
+            status: 500,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            }
+          }))
         }
       })
-    })
+
+      pythonProcess.on('error', (error) => {
+        console.error('Process error:', error);
+        reject(error);
+      });
+    });
   } catch (error) {
+    console.error('Request error:', error);
     return NextResponse.json({ 
-      success: false,
       error: 'Error processing request',
       details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 })
+    }, {
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
+    });
+  }
+}
+
+
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    },
+  });
+}
+
+export const config = {
+  type: "setting",
+  settings: {
+    "http.cors": true,
+    "http.corsAllowOrigins": ["*"],
+    "http.corsAllowMethods": ["GET, POST, PUT, DELETE, OPTIONS"],
+    "http.corsAllowHeaders": ["Content-Type, Authorization"]
   }
 }

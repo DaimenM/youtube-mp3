@@ -2,6 +2,19 @@ import { spawn } from 'child_process'
 import path from 'path'
 import { NextResponse } from 'next/server'
 import { put, del } from '@vercel/blob'
+
+export async function GET() {
+  return NextResponse.json({
+    success: true
+  }, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    }
+  });
+}
+
 export async function POST(request: Request): Promise<Response> {
   try {
     const { url } = await request.json()
@@ -45,20 +58,50 @@ export async function POST(request: Request): Promise<Response> {
               contentType: 'audio/mpeg'
             })
             console.log('Uploaded to blob:', blob.url)
+            const metadata = {
+              fileName: title,
+              artistName: '',  // Add actual artist name if available
+              albumName: ''    // Add actual album name if available
+            }
             resolve(NextResponse.json({ 
+              success: true,
               downloadUrl: blob.url,
-              videoTitle: title  // Add this line
-            }))
+              fileName: metadata.fileName,
+              artistName: metadata.artistName,
+              albumName: metadata.albumName
+            }, {
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+              }
+            }));
           } catch (error) {
-            console.error('Blob upload error:', error)
+            console.error('Blob upload error:', error);
             resolve(NextResponse.json({ 
-              error: 'Failed to upload to blob storage'
-            }, { status: 500 }))
+              success: false, 
+              error: 'Failed to upload edited MP3' 
+            }, {
+              status: 500,
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+              }
+            }));
           }
         } else {
           resolve(NextResponse.json({ 
-            error: 'Conversion process failed'
-          }, { status: 500 }))
+            success: false, 
+            error: 'Failed to edit MP3' 
+          }, {
+            status: 500,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            }
+          }));
         }
       })
 
@@ -70,9 +113,17 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     console.error('Request error:', error)
     return NextResponse.json({ 
+      success: false,
       error: 'Error processing request',
       details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 })
+    }, {
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
+    });
   }
 }
 
@@ -102,3 +153,14 @@ export async function DELETE(request: Request) {
       }, { status: 500 });
     }
   }
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    },
+  });
+}
