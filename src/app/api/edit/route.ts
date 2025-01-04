@@ -4,21 +4,18 @@ import path from 'path'
 import fs from 'fs'
 import os from 'os'
 import { put } from '@vercel/blob'
+import { corsHeaders, handleOptions } from '@/utils/cors'
 
 let lastEditedFileName: string | null = null;
 
 // Add these fields to the GET response
 export async function GET() {
-  return NextResponse.json({
-    fileName: lastEditedFileName || null,
-    success: true
-  }, {
-    headers: {
-      'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-    }
-  });
+  return corsHeaders(
+    NextResponse.json({
+      fileName: lastEditedFileName || null,
+      success: true
+    })
+  )
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -83,45 +80,35 @@ export async function POST(request: Request): Promise<Response> {
               await fs.promises.unlink(metadata.coverArt)
             }
 
-            resolve(NextResponse.json({ 
-              success: true,
-              downloadUrl: blob.url,
-              fileName: metadata.fileName,
-              artistName: metadata.artistName,
-              albumName: metadata.albumName
-            }, {
-              headers: {
-                'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-              }
-            }))
+            resolve(corsHeaders(
+              NextResponse.json({ 
+                success: true,
+                downloadUrl: blob.url,
+                fileName: metadata.fileName,
+                artistName: metadata.artistName,
+                albumName: metadata.albumName
+              })
+            ))
           } catch (error) {
             console.error('Blob upload error:', error)
-            resolve(NextResponse.json({ 
-              success: false, 
-              error: 'Failed to upload edited MP3' 
-            }, { 
-              status: 500,
-              headers: {
-                'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-              }
-            }))
+            resolve(corsHeaders(
+              NextResponse.json({ 
+                success: false, 
+                error: 'Failed to upload edited MP3' 
+              }, { 
+                status: 500
+              })
+            ))
           }
         } else {
-          resolve(NextResponse.json({ 
-            success: false, 
-            error: 'Failed to edit MP3' 
-          }, { 
-            status: 500,
-            headers: {
-              'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
-              'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-            }
-          }))
+          resolve(corsHeaders(
+            NextResponse.json({ 
+              success: false, 
+              error: 'Failed to edit MP3' 
+            }, { 
+              status: 500
+            })
+          ))
         }
       })
 
@@ -132,31 +119,17 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error) {
     console.error('Request error:', error);
-    return NextResponse.json({ 
-      error: 'Error processing request',
-      details: error instanceof Error ? error.message : String(error)
-    }, {
-      status: 500,
-      headers: {
-        'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-      }
-    });
+    return corsHeaders(
+      NextResponse.json({ 
+        error: 'Error processing request',
+        details: error instanceof Error ? error.message : String(error)
+      }, { status: 500 })
+    )
   }
 }
 
-
-
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-    },
-  });
+  return handleOptions()
 }
 
 export const config = {
