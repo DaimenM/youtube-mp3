@@ -67,7 +67,8 @@ export async function POST(request: Request): Promise<Response> {
                 downloadUrl: blob.url,
                 fileName: metadata.fileName,
                 artistName: metadata.artistName,
-                albumName: metadata.albumName
+                albumName: metadata.albumName,
+                videoTitle: title // Add this line
               })
             ));
           } catch (error) {

@@ -20,7 +20,6 @@ import { Header } from '@/components/header'
 
 export default function Home() {
   // Add new state for edited filename
-  
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [isConverting, setIsConverting] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState<string>('')
@@ -33,7 +32,7 @@ export default function Home() {
       const blob = await response.blob();
   
       // Get edited filename if available
-      const fileNameResponse = await fetch('https://youtube-mp3-rtyf.onrender.com/api/edit');
+      const fileNameResponse = await fetch('api/edit');
       const fileNameData = await fileNameResponse.json();
       const finalFileName = fileNameData.fileName || filename;
   
@@ -74,14 +73,16 @@ export default function Home() {
     }
   }
 
+  // Update the handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsConverting(true)
     setDownloadUrl('')
+    setVideoTitle('') // Reset title
 
     try {
       abortControllerRef.current = new AbortController()
-      const response = await fetch('https://youtube-mp3-rtyf.onrender.com/api/convert', {
+      const response = await fetch('api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: youtubeUrl }),
@@ -91,7 +92,7 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json()
         setDownloadUrl(data.downloadUrl)
-        setVideoTitle(data.videoTitle) // Update this line
+        setVideoTitle(data.videoTitle) // Set from response
       } else {
         console.error('Conversion failed')
       }
@@ -132,7 +133,7 @@ export default function Home() {
   // Add delete function
   const deleteBlob = async (url: string) => {
     try {
-      const response = await fetch('https://youtube-mp3-rtyf.onrender.com/api/convert', {
+      const response = await fetch('api/convert', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
@@ -253,6 +254,7 @@ export default function Home() {
             <p className="text-sm text-gray-600">Enter a valid YouTube link to convert it to MP3</p>
           </CardFooter>
         </Card>
+
       </main>
     </div>
   )
