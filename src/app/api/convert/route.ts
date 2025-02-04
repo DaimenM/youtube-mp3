@@ -24,6 +24,20 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'YouTube URL is required' }, { status: 400 })
     }
 
+    // Add auth initialization
+    const authScriptPath = path.join(process.cwd(), 'src', 'scripts', 'youtube_auth.py')
+    const authProcess = spawn('python', [authScriptPath])
+    
+    await new Promise((resolve, reject) => {
+      authProcess.on('close', (code) => {
+        if (code === 0) {
+          resolve(true)
+        } else {
+          reject(new Error('Authentication failed'))
+        }
+      })
+    })
+
     const pythonScriptPath = path.join(process.cwd(),'src', 'scripts', 'conversion.py')
     const pythonProcess = spawn('python', [pythonScriptPath, url])
 
@@ -139,4 +153,4 @@ export async function DELETE(request: Request) {
 
 export async function OPTIONS() {
   return handleOptions()
-}
+} 
