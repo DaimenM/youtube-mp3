@@ -25,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // Add auth initialization
-    const authScriptPath = path.join(process.cwd(), 'src', 'scripts', 'youtube_auth.py')
+    /*const authScriptPath = path.join(process.cwd(), 'src', 'scripts', 'youtube_auth.py')
     const authProcess = spawn('python', [authScriptPath])
     
     await new Promise((resolve, reject) => {
@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
         }
       })
     })
-
+*/
     const pythonScriptPath = path.join(process.cwd(),'src', 'scripts', 'conversion.py')
     const pythonProcess = spawn('python', [pythonScriptPath, url])
 
