@@ -9,7 +9,7 @@ import logging
 
 class YouTubeAuth:
     def __init__(self):
-        self.cookie_file = 'cookies.txt'
+        self.cookie_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies.txt')
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         
@@ -115,4 +115,3 @@ class YouTubeAuth:
             email, password = self.get_credentials()
             if not self.login(email, password):
                 raise Exception("Failed to authenticate with YouTube")
-            

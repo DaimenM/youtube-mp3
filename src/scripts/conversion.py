@@ -3,8 +3,11 @@ import os
 from yt_dlp import YoutubeDL
 
 def convert_to_mp3(url):
-    cookie_file = 'cookies.txt'
+    cookie_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies.txt')
     
+    if not os.path.exists(cookie_file):
+        print(f"Cookie file not found at: {cookie_file}", file=sys.stderr)
+        raise Exception("Cookie file not found - please authenticate first")
 
     ydl_opts = {
         'format': 'bestaudio/best',
