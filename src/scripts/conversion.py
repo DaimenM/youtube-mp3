@@ -4,7 +4,8 @@ from yt_dlp import YoutubeDL
 print("test")
 def convert_to_mp3(url):
     try:
-        cookie_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies.txt')
+        #cookie_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies.txt')
+        cookie_file = "./cookies.txt"
         
         if not os.path.exists(cookie_file):
             print(f"Cookie file not found at: {cookie_file}", file=sys.stderr)
