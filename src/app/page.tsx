@@ -28,7 +28,9 @@ export default function Home() {
 
   async function downloadFile(url: string, filename: string) {
     try {
+      // Download the file from the blob URL directly
       const response = await fetch(url);
+      if (!response.ok) throw new Error('Download failed');
       const blob = await response.blob();
   
       // Get edited filename if available
@@ -51,15 +53,23 @@ export default function Home() {
           await writable.close();
           return;
         } catch (err) {
-          // If user cancels, just return - don't fall back to traditional download
           if (err instanceof Error && err.name === 'AbortError') {
             return;
           }
-          console.log('Falling back to traditional download');
+          // Fall through to traditional download
         }
       }
   
-      // ...existing fallback code...
+      // Fallback for browsers without File System Access API
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${finalFileName}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+  
     } catch (error) {
       console.error('Download failed:', error);
     }

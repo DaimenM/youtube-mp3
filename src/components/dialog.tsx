@@ -64,7 +64,7 @@ export function EditDialog({ isOpen, onClose, initialFileName, downloadUrl, onUp
 
       const data = await response.json()
 
-      if (response.ok && data.downloadUrl) {
+      if (response.ok) {
         onUpdate(data.downloadUrl)
         onClose()
       } else {

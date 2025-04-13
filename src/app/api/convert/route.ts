@@ -1,21 +1,14 @@
 import { spawn } from 'child_process'
+import {PythonShell} from 'python-shell'
 import path from 'path'
 import { NextResponse } from 'next/server'
 import { put, del } from '@vercel/blob'
-import { corsHeaders, handleOptions } from '@/utils/cors'
 
 export async function GET() {
   return NextResponse.json({
     success: true
-  }, {
-    headers: {
-      'Access-Control-Allow-Origin': 'https://youtube-mp3-lilac.vercel.app',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-    }
-  });
+  } );
 }
-
 export async function POST(request: Request): Promise<Response> {
   try {
     const { url } = await request.json()
@@ -24,23 +17,13 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'YouTube URL is required' }, { status: 400 })
     }
 
-    // Add auth initialization
-    /*const authScriptPath = path.join(process.cwd(), 'src', 'scripts', 'youtube_auth.py')
-    const authProcess = spawn('python', [authScriptPath])
+    // Use absolute path for Python executable
+    const pythonScriptPath = path.join(process.cwd(), 'src', 'scripts', 'conversion.py')
     
-    await new Promise((resolve, reject) => {
-      authProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve(true)
-        } else {
-          reject(new Error('Authentication failed'))
-        }
-      })
+    // Add error handling for Python process
+    const pythonProcess = spawn('python', [pythonScriptPath, url], {
+      env: { ...process.env, PYTHONPATH: process.cwd() }
     })
-*/
-    const pythonScriptPath = path.join(process.cwd(),'src', 'scripts', 'conversion.py')
-    const pythonProcess = spawn('python', [pythonScriptPath, url])
-
     return new Promise<Response>((resolve, reject) => {
       let title = ''
       const chunks: Buffer[] = []
@@ -57,6 +40,9 @@ export async function POST(request: Request): Promise<Response> {
       pythonProcess.stdout.on('data', (data) => {
         chunks.push(data)
       })
+      pythonProcess.on('message', function (message) {
+        console.log('Python message:', message)
+      })
 
       pythonProcess.on('close', async (code) => {
         if (code === 0 && chunks.length > 0) {
@@ -70,37 +56,20 @@ export async function POST(request: Request): Promise<Response> {
               contentType: 'audio/mpeg'
             })
             console.log('Uploaded to blob:', blob.url)
-            const metadata = {
-              fileName: title,
-              artistName: '',
-              albumName: ''
-            }
-            resolve(corsHeaders(
-              NextResponse.json({ 
-                success: true,
-                downloadUrl: blob.url,
-                fileName: metadata.fileName,
-                artistName: metadata.artistName,
-                albumName: metadata.albumName,
-                videoTitle: title // Add this line
-              })
-            ));
+            resolve(NextResponse.json({ 
+              downloadUrl: blob.url,
+              videoTitle: title  // Add this line
+            }))
           } catch (error) {
-            console.error('Blob upload error:', error);
-            resolve(corsHeaders(
-              NextResponse.json({ 
-                success: false, 
-                error: 'Failed to upload edited MP3' 
-              }, { status: 500 })
-            ));
+            console.error('Blob upload error:', error)
+            resolve(NextResponse.json({ 
+              error: 'Failed to upload to blob storage'
+            }, { status: 500 }))
           }
         } else {
-          resolve(corsHeaders(
-            NextResponse.json({ 
-              success: false, 
-              error: 'Failed to edit MP3' 
-            }, { status: 500 })
-          ));
+          resolve(NextResponse.json({ 
+            error: 'Conversion process failed'
+          }, { status: 500 }))
         }
       })
 
@@ -111,13 +80,10 @@ export async function POST(request: Request): Promise<Response> {
     })
   } catch (error) {
     console.error('Request error:', error)
-    return corsHeaders(
-      NextResponse.json({ 
-        success: false,
-        error: 'Error processing request',
-        details: error instanceof Error ? error.message : String(error)
-      }, { status: 500 })
-    );
+    return NextResponse.json({ 
+      error: 'Error processing request',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
 
@@ -136,21 +102,12 @@ export async function DELETE(request: Request) {
     console.log('Attempting to delete blob:', url);
     await del(url);
     console.log('Successfully deleted blob:', url);
-
-    return corsHeaders(
-      NextResponse.json({ success: true })
-    );
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Blob deletion error:', error);
-    return corsHeaders(
-      NextResponse.json({ 
+      return NextResponse.json({ 
         error: 'Failed to delete blob',
         details: error instanceof Error ? error.message : String(error) 
       }, { status: 500 })
-    );
   }
 }
-
-export async function OPTIONS() {
-  return handleOptions()
-} 
