@@ -1,5 +1,4 @@
 import { spawn } from 'child_process'
-import {PythonShell} from 'python-shell'
 import path from 'path'
 import { NextResponse } from 'next/server'
 import { put, del } from '@vercel/blob'

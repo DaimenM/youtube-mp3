@@ -1,6 +1,5 @@
 import sys
 import os
-import tempfile
 from yt_dlp import YoutubeDL
 print("test")
 def convert_to_mp3(url):
@@ -39,7 +38,7 @@ def convert_to_mp3(url):
             filename = f"{title}.mp3"
             with open(filename, 'rb') as f:
                 sys.stdout.buffer.write(f.read())
-            #os.remove(filename)  # Clean up the temporary file
+            os.remove(filename)  # Clean up the temporary file
             return True
 
                 
