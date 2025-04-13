@@ -13,7 +13,7 @@ def convert_to_mp3(url):
         # Create temp file
 
         ydl_opts = {
-            'cookiefile': cookie_file,
+            'cookies': cookie_file,
             'format': 'bestaudio/best',  # Get best available audio
             'quiet': True,
             'no_warnings': False,
