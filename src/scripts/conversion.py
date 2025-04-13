@@ -66,6 +66,6 @@ def convert_to_mp3(url):
 if len(sys.argv) != 2:
     print("Usage: python conversion.py <youtube_url>")
     sys.exit(1)
-get_cookies()
+#get_cookies()
 success = convert_to_mp3(sys.argv[1])
 sys.exit(0 if success else 1)
