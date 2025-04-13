@@ -4,17 +4,8 @@ from yt_dlp import YoutubeDL
 print("test")
 def convert_to_mp3(url):
     try:
-        #cookie_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cookies.txt')
-        cookie_file = "./cookies.txt"
-        
-        if not os.path.exists(cookie_file):
-            print(f"Cookie file not found at: {cookie_file}", file=sys.stderr)
-            raise Exception("Cookie file not found - please authenticate first")
-
-        # Create temp file
 
         ydl_opts = {
-            'cookies': cookie_file,
             'format': 'bestaudio/best',  # Get best available audio
             'quiet': True,
             'no_warnings': False,
@@ -22,6 +13,7 @@ def convert_to_mp3(url):
             'retries': 10,    # Retry on error
             'fragment_retries': 10,  # Retry on fragment error
             'outtmpl': '%(title)s.%(ext)s',  # Temporary file
+            'cookiesfrombrowser': ('chrome',),  # Use cookies from Chrome
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
