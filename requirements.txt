@@ -1,6 +1,6 @@
-yt-dlp==2025.02.19
-ffmpeg-python==7.1.0
-pydub==0.25.1
+yt-dlp==2025.3.31
+ffmpeg-python
+pydub
 selenium
 webdriver-manager
-mutagen==1.4.2
+mutagen
