@@ -1,6 +1,25 @@
 import sys
 import os
 from yt_dlp import YoutubeDL
+import json
+from datetime import datetime, timedelta
+
+def get_cookies():
+    cookie_json = os.environ.get("MY_COOKIES")
+    cookies = json.loads(cookie_json)
+
+    with open("cookies.txt", "w") as f:
+        f.write("# Netscape HTTP Cookie File\n")
+        for cookie in cookies:
+            domain = cookie.get("domain", ".youtube.com")
+            flag = "TRUE" if domain.startswith('.') else "FALSE"
+            path = cookie.get("path", "/")
+            secure = "TRUE" if cookie.get("secure", False) else "FALSE"
+            expires = int((datetime.utcnow() + timedelta(days=180)).timestamp())
+            name = cookie["name"]
+            value = cookie["value"]
+
+            f.write(f"{domain}\t{flag}\t{path}\t{secure}\t{expires}\t{name}\t{value}\n")
 def convert_to_mp3(url):
     try:
         cookie_file = os.path.join(os.getcwd(), 'cookies.txt')
@@ -47,5 +66,6 @@ def convert_to_mp3(url):
 if len(sys.argv) != 2:
     print("Usage: python conversion.py <youtube_url>")
     sys.exit(1)
+get_cookies()
 success = convert_to_mp3(sys.argv[1])
 sys.exit(0 if success else 1)
