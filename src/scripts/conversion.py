@@ -35,7 +35,7 @@ def convert_to_mp3(url):
             'retries': 10,    # Retry on error
             'fragment_retries': 10,  # Retry on fragment error
             'outtmpl': '%(title)s.%(ext)s',  # Temporary file
-            'cookies': cookie_file,  # Path to your cookies file
+            'cookiesfrombrowser': ('firefox',),  # Path to your cookies file
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
