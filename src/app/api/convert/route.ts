@@ -20,6 +20,7 @@ export async function POST(request: Request): Promise<Response> {
     const pythonScriptPath = path.join(process.cwd(), 'src', 'scripts', 'conversion.py')
     
     // Add error handling for Python process
+    console.log("Starting conversion")
     const pythonProcess = spawn('python', [pythonScriptPath, url], {
     })
     return new Promise<Response>((resolve, reject) => {
@@ -33,6 +34,9 @@ export async function POST(request: Request): Promise<Response> {
         } else {
           console.error(`stderr: ${data}`)
         }
+      })
+      pythonProcess.stdout.on('error', (error) => {
+        console.error('stdout error:', error)
       })
 
       pythonProcess.stdout.on('data', (data) => {
