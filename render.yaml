@@ -1,11 +1,19 @@
 services:
-- type: web
-  name: next-js
-  runtime: node
-  plan: starter
-  buildCommand: npm install; npm run build
-  startCommand: npm run start
-  autoDeploy: true
-  envVars:
-  - key: NODE_ENV
-    value: production
+  - type: web
+    name: youtube-mp3
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && pip3 install -r requirements.txt && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PYTHON_EXECUTABLE
+        value: python3
+      - key: CONVERSION_TIMEOUT_MS
+        value: "240000"
+      - key: BLOB_READ_WRITE_TOKEN
+        sync: false
+      - key: MY_COOKIES
+        sync: false

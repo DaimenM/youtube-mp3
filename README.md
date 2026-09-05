@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# YouTube to MP3
 
-## Getting Started
+A Next.js application that converts a YouTube video to MP3, stores the result temporarily in Vercel Blob, and lets the user edit common ID3 metadata before downloading it.
 
-First, run the development server:
+Only download content when you have permission to do so, and follow YouTube's terms and applicable copyright law.
+
+## Requirements
+
+- Node.js 20 or later
+- Python 3.10 or later
+- FFmpeg available on `PATH`
+- A Vercel Blob store
+
+## Local setup
+
+1. Install JavaScript and Python dependencies:
+
+   ```bash
+   npm ci
+   python3 -m pip install -r requirements.txt
+   ```
+
+2. Create `.env.local` and add your Blob token:
+
+   ```dotenv
+   BLOB_READ_WRITE_TOKEN=your_token_here
+   # Optional JSON cookie array for restricted videos:
+   MY_COOKIES=[]
+   ```
+
+   The server uses `python3` by default. Set `PYTHON_EXECUTABLE` if your Python executable has another name. `PYTHON_PATH` remains supported as a legacy alias.
+
+   `MY_COOKIES` must be a JSON array of browser-cookie objects. Leave it unset unless cookies are required; stale cookies can cause YouTube authentication failures.
+
+3. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+4. Open [http://localhost:3000](http://localhost:3000).
+
+An optional Netscape-format `cookies.txt` file may be placed in the project root for videos that require an authenticated YouTube session. This file is ignored by Git and must never be committed.
+
+## Backend diagnostics
+
+`GET /api/convert` checks Python, FFmpeg, Node.js, and Blob configuration without exposing secret values. A healthy response has `status: "ready"`.
+
+Conversion failures include a stable error `code`, failing `stage`, diagnostic `details`, an actionable `suggestion`, and a `requestId` that is also written to the server log. The request timeout defaults to four minutes and can be configured with `CONVERSION_TIMEOUT_MS` between 30 seconds and 10 minutes.
+
+## Checks
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run lint
+npm run typecheck
+npm test
+python3 -m compileall -q src/scripts
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deployment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The included `render.yaml` installs both Node and Python dependencies. The runtime must also provide FFmpeg and the `BLOB_READ_WRITE_TOKEN` environment variable.

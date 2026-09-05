@@ -1,8 +1,16 @@
 import sys
 import json
-import imghdr
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC
+
+
+def detect_image_mime(image_data):
+    if image_data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if image_data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    return None
+
 
 def edit_mp3(file_path, metadata):
     try:
@@ -12,18 +20,16 @@ def edit_mp3(file_path, metadata):
         if audio.tags is None:
             print("No existing tags, creating new", file=sys.stderr)
             audio.add_tags()
-        else:
-            print("Existing tags found", file=sys.stderr)
-            # Clear existing tags to avoid duplicates
-            audio.tags.delete()
-            audio.add_tags()
 
-        # Set metadata
+        # Replace only fields managed by the form and preserve unrelated tags.
         if metadata.get('fileName'):
+            audio.tags.delall('TIT2')
             audio.tags.add(TIT2(encoding=3, text=metadata['fileName']))
         if metadata.get('artistName'):
+            audio.tags.delall('TPE1')
             audio.tags.add(TPE1(encoding=3, text=metadata['artistName']))
         if metadata.get('albumName'):
+            audio.tags.delall('TALB')
             audio.tags.add(TALB(encoding=3, text=metadata['albumName']))
 
         # Handle cover art
@@ -32,11 +38,10 @@ def edit_mp3(file_path, metadata):
                 print(f"Processing cover art from: {metadata['coverArt']}", file=sys.stderr)
                 with open(metadata['coverArt'], 'rb') as img_file:
                     img_data = img_file.read()
-                    img_type = imghdr.what(None, img_data)
-                    print(f"Detected image type: {img_type}", file=sys.stderr)
+                    mime_type = detect_image_mime(img_data)
+                    print(f"Detected image type: {mime_type}", file=sys.stderr)
                     
-                    if img_type:
-                        mime_type = f'image/{img_type}'
+                    if mime_type:
                         # Remove any existing APIC frames
                         audio.tags.delall('APIC')
                         # Add new cover art
@@ -50,6 +55,8 @@ def edit_mp3(file_path, metadata):
                             )
                         )
                         print("Cover art added successfully", file=sys.stderr)
+                    else:
+                        raise ValueError("Unsupported cover image format")
             except Exception as e:
                 print(f"Cover art error: {str(e)}", file=sys.stderr)
 

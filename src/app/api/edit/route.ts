@@ -1,132 +1,129 @@
-import { NextResponse } from 'next/server'
-import { spawn } from 'child_process'
-import path from 'path'
-import fs from 'fs'
-import os from 'os'
-import { put } from '@vercel/blob'
+import { spawn } from "node:child_process"
+import { randomUUID } from "node:crypto"
+import fs from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+import { del, put } from "@vercel/blob"
+import { NextResponse } from "next/server"
+import { isVercelBlobUrl, sanitizeFileName } from "@/lib/server-validation"
 
-let lastEditedFileName: string | null = null;
+export const runtime = "nodejs"
 
-// Add these fields to the GET response
-export async function GET() {
-  return NextResponse.json({
-      fileName: lastEditedFileName || null,
-      success: true
-    })
+const MAX_MP3_BYTES = 100 * 1024 * 1024
+const MAX_COVER_BYTES = 10 * 1024 * 1024
+const ALLOWED_COVER_TYPES = new Set(["image/jpeg", "image/png"])
+
+async function runEditor(scriptPath: string, mp3Path: string, metadata: object) {
+  const pythonExecutable = process.env.PYTHON_EXECUTABLE || "python3"
+  const child = spawn(pythonExecutable, [scriptPath, mp3Path, JSON.stringify(metadata)], {
+    stdio: ["ignore", "ignore", "pipe"],
+  })
+  const stderr: Buffer[] = []
+  child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
+
+  const result = await new Promise<{ code: number | null; error?: Error }>((resolve) => {
+    child.once("error", (error) => resolve({ code: null, error }))
+    child.once("close", (code) => resolve({ code }))
+  })
+
+  if (result.error) throw result.error
+  if (result.code !== 0) {
+    console.error("MP3 editor failed:", Buffer.concat(stderr).toString("utf8"))
+    throw new Error("Failed to edit MP3")
+  }
 }
 
 export async function POST(request: Request): Promise<Response> {
-  let tempMp3Path: string | null = null;
-  let tempCoverPath: string | null = null;
+  const tempPaths: string[] = []
 
   try {
-    const formData = await request.formData();
-    console.log("Processing request with formData:", 
-      Object.fromEntries(formData.entries()));
+    let formData: FormData
+    try {
+      formData = await request.formData()
+    } catch {
+      return NextResponse.json({ error: "Invalid form data" }, { status: 400 })
+    }
+    const downloadUrl = formData.get("downloadUrl")
+    const fileName = sanitizeFileName(formData.get("fileName"))
 
-    const downloadUrl = formData.get('downloadUrl') as string;
-    if (!downloadUrl) {
-      throw new Error('Download URL is required');
+    if (!isVercelBlobUrl(downloadUrl)) {
+      return NextResponse.json({ error: "Invalid download URL" }, { status: 400 })
+    }
+    if (!fileName) {
+      return NextResponse.json({ error: "Song name is required" }, { status: 400 })
     }
 
-    // Download and validate MP3
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      throw new Error('Failed to download MP3');
+    const coverArtEntry = formData.get("coverArt")
+    const coverArt = coverArtEntry instanceof File && coverArtEntry.size > 0
+      ? coverArtEntry
+      : null
+    if (coverArt && (!ALLOWED_COVER_TYPES.has(coverArt.type) || coverArt.size > MAX_COVER_BYTES)) {
+      return NextResponse.json(
+        { error: "Cover art must be a JPEG or PNG no larger than 10 MB" },
+        { status: 400 },
+      )
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const tempDir = os.tmpdir();
-    tempMp3Path = path.join(tempDir, `temp-${Date.now()}.mp3`);
-    await fs.promises.writeFile(tempMp3Path, buffer);
+    const response = await fetch(downloadUrl)
+    if (!response.ok) throw new Error("Failed to download MP3")
 
-    // Process metadata
-    const metadata = {
-      fileName: formData.get('fileName'),
-      artistName: formData.get('artistName'),
-      albumName: formData.get('albumName'),
-      coverArt: null as string | null,
-    };
+    const contentLength = Number(response.headers.get("content-length"))
+    if (Number.isFinite(contentLength) && contentLength > MAX_MP3_BYTES) {
+      return NextResponse.json({ error: "MP3 is too large to edit" }, { status: 413 })
+    }
 
-    // Handle cover art
-    const coverArt = formData.get('coverArt') as File;
+    const mp3Buffer = Buffer.from(await response.arrayBuffer())
+    if (mp3Buffer.length === 0 || mp3Buffer.length > MAX_MP3_BYTES) {
+      return NextResponse.json({ error: "MP3 is empty or too large to edit" }, { status: 413 })
+    }
+
+    const id = randomUUID()
+    const tempMp3Path = path.join(os.tmpdir(), `youtube-mp3-${id}.mp3`)
+    tempPaths.push(tempMp3Path)
+    await fs.writeFile(tempMp3Path, mp3Buffer, { flag: "wx" })
+
+    let tempCoverPath: string | null = null
     if (coverArt) {
-      tempCoverPath = path.join(tempDir, `cover-${Date.now()}.jpg`);
-      await fs.promises.writeFile(
-        tempCoverPath,
-        Buffer.from(await coverArt.arrayBuffer())
-      );
-      metadata.coverArt = tempCoverPath;
+      const extension = coverArt.type === "image/png" ? "png" : "jpg"
+      tempCoverPath = path.join(os.tmpdir(), `youtube-cover-${id}.${extension}`)
+      tempPaths.push(tempCoverPath)
+      await fs.writeFile(tempCoverPath, Buffer.from(await coverArt.arrayBuffer()), { flag: "wx" })
     }
 
-    // Store the fileName for GET requests
-    lastEditedFileName = metadata.fileName?.toString() || null;
+    const metadata = {
+      fileName,
+      artistName: sanitizeFileName(formData.get("artistName")),
+      albumName: sanitizeFileName(formData.get("albumName")),
+      coverArt: tempCoverPath,
+    }
 
-    // Run Python script
-    const pythonScriptPath = path.join(process.cwd(),'src', 'scripts', 'edit_mp3.py')
-    const pythonProcess = spawn('python', [
-      pythonScriptPath,
-      tempMp3Path,
-      JSON.stringify(metadata)
-    ], {
-  })
+    const scriptPath = path.join(process.cwd(), "src", "scripts", "edit_mp3.py")
+    await runEditor(scriptPath, tempMp3Path, metadata)
 
-    pythonProcess.stderr?.on('data', (data) => {
-      console.error('Python error:', data.toString());
-    });
-
-    pythonProcess.stdout?.on('data', (data) => {
-      console.log('Python output:', data.toString());
-    });
-
-    return new Promise((resolve) => {
-      pythonProcess.on('close', async (code) => {
-        if (code === 0) {
-          try {
-            if (!tempMp3Path) {
-              throw new Error('Temporary MP3 file path is null');
-            }
-            // Upload edited file to blob storage
-            const blob = await put(`${metadata.fileName}.mp3`, await fs.promises.readFile(tempMp3Path), {
-              access: 'public',
-              addRandomSuffix: true,
-              contentType: 'audio/mpeg'
-            })
-
-            // Cleanup temporary files
-            if (tempMp3Path) {
-              await fs.promises.unlink(tempMp3Path)
-            }
-            if (metadata.coverArt) {
-              await fs.promises.unlink(metadata.coverArt)
-            }
-
-            resolve(NextResponse.json({ 
-              success: true,
-              downloadUrl: blob.url 
-            }))
-          } catch (error) {
-            console.error('Blob upload error:', error)
-            resolve(NextResponse.json({ error: 'Failed to upload edited MP3' }, { status: 500 }))
-          }
-        } else {
-          resolve(NextResponse.json({ error: 'Failed to edit MP3' }, { status: 500 }))
-        }
-      })
+    const blob = await put(`${fileName}.mp3`, await fs.readFile(tempMp3Path), {
+      access: "public",
+      addRandomSuffix: true,
+      contentType: "audio/mpeg",
     })
-  } catch (error) {
-    // Cleanup temp files
-    if (tempMp3Path) {
-      try { await fs.promises.unlink(tempMp3Path); } catch {}
-    }
-    if (tempCoverPath) {
-      try { await fs.promises.unlink(tempCoverPath); } catch {}
+
+    try {
+      await del(downloadUrl)
+    } catch (error) {
+      console.error("Failed to remove original blob after editing:", error)
     }
 
-    console.error('Error:', error);
-    return NextResponse.json({
-      error: 'Error processing request',
-      details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    return NextResponse.json({ success: true, downloadUrl: blob.url, fileName })
+  } catch (error) {
+    console.error("MP3 edit error:", error)
+    return NextResponse.json({ error: "Unable to edit the MP3" }, { status: 500 })
+  } finally {
+    await Promise.all(tempPaths.map(async (tempPath) => {
+      try {
+        await fs.unlink(tempPath)
+      } catch (error) {
+        const code = error instanceof Error && "code" in error ? error.code : undefined
+        if (code !== "ENOENT") console.error("Temporary file cleanup failed:", error)
+      }
+    }))
   }
 }

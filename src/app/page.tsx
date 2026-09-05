@@ -1,116 +1,177 @@
-"use client";
-declare global {
-  interface Window {
-    showSaveFilePicker: (options?: {
-      suggestedName?: string;
-      types?: Array<{
-        description: string;
-        accept: Record<string, string[]>;
-      }>;
-    }) => Promise<FileSystemFileHandle>;
+"use client"
+
+import { useEffect, useRef, useState } from "react"
+import { Loader2, Music } from "lucide-react"
+import { Button } from "@/components/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/card"
+import { EditDialog } from "@/components/dialog"
+import { Header } from "@/components/header"
+import { Input } from "@/components/input"
+
+interface FilePickerWindow extends Window {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string
+    types?: Array<{
+      description: string
+      accept: Record<string, string[]>
+    }>
+  }) => Promise<FileSystemFileHandle>
+}
+
+interface ConversionError {
+  message: string
+  code?: string
+  stage?: string
+  details?: string
+  suggestion?: string
+  requestId?: string
+}
+
+function parseApiError(data: unknown): ConversionError {
+  if (typeof data !== "object" || data === null) {
+    return { message: "The server returned an unreadable error response." }
+  }
+
+  const error = data as Record<string, unknown>
+  return {
+    message: typeof error.error === "string" ? error.error : "Conversion failed.",
+    code: typeof error.code === "string" ? error.code : undefined,
+    stage: typeof error.stage === "string" ? error.stage : undefined,
+    details: typeof error.details === "string" ? error.details : undefined,
+    suggestion: typeof error.suggestion === "string" ? error.suggestion : undefined,
+    requestId: typeof error.requestId === "string" ? error.requestId : undefined,
   }
 }
-import { useState, useRef, useEffect } from 'react'
-import { EditDialog } from '@/components/dialog'
-import { Button } from '@/components/button'
-import { Input } from '@/components/input'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/card'
-import { Loader2, Music } from 'lucide-react'
-import { Header } from '@/components/header'
+
+function safeDownloadName(value: string) {
+  return value
+    .normalize("NFKC")
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100) || "audio"
+}
+
+async function deleteBlob(url: string) {
+  const response = await fetch("/api/convert", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  })
+
+  if (!response.ok) throw new Error("Failed to delete the temporary audio file")
+}
 
 export default function Home() {
-  // Add new state for edited filename
-  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [youtubeUrl, setYoutubeUrl] = useState("")
   const [isConverting, setIsConverting] = useState(false)
-  const [downloadUrl, setDownloadUrl] = useState<string>('')
-  const [videoTitle, setVideoTitle] = useState('')
+  const [downloadUrl, setDownloadUrl] = useState("")
+  const [videoTitle, setVideoTitle] = useState("")
+  const [error, setError] = useState<ConversionError | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  async function downloadFile(url: string, filename: string) {
+  useEffect(() => {
+    if (!downloadUrl) return
+
+    const handlePageHide = (event: PageTransitionEvent) => {
+      if (event.persisted) return
+      navigator.sendBeacon(
+        "/api/cleanup",
+        new Blob([JSON.stringify({ url: downloadUrl })], { type: "application/json" }),
+      )
+    }
+
+    window.addEventListener("pagehide", handlePageHide)
+    return () => window.removeEventListener("pagehide", handlePageHide)
+  }, [downloadUrl])
+
+  async function downloadFile() {
+    setError(null)
+
     try {
-      // Download the file from the blob URL directly
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-  
-      // Get edited filename if available
-      const fileNameResponse = await fetch('api/edit');
-      const fileNameData = await fileNameResponse.json();
-      const finalFileName = fileNameData.fileName || filename;
-  
-      // Modern browsers: Use File System Access API
-      if ('showSaveFilePicker' in window) {
+      const response = await fetch(downloadUrl)
+      if (!response.ok) throw new Error("Download failed")
+      const blob = await response.blob()
+      const fileName = `${safeDownloadName(videoTitle)}.mp3`
+      const filePicker = (window as FilePickerWindow).showSaveFilePicker
+
+      if (filePicker) {
         try {
-          const handle = await window.showSaveFilePicker({
-            suggestedName: `${finalFileName}.mp3`,
+          const handle = await filePicker({
+            suggestedName: fileName,
             types: [{
-              description: 'MP3 Audio File',
-              accept: {'audio/mpeg': ['.mp3']},
+              description: "MP3 audio file",
+              accept: { "audio/mpeg": [".mp3"] },
             }],
-          });
-          const writable = await handle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-          return;
-        } catch (err) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            return;
-          }
-          // Fall through to traditional download
+          })
+          const writable = await handle.createWritable()
+          await writable.write(blob)
+          await writable.close()
+          return
+        } catch (pickerError) {
+          if (pickerError instanceof Error && pickerError.name === "AbortError") return
         }
       }
-  
-      // Fallback for browsers without File System Access API
-      const blobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `${finalFileName}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(blobUrl);
-  
-    } catch (error) {
-      console.error('Download failed:', error);
+
+      const blobUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = blobUrl
+      anchor.download = fileName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(blobUrl)
+    } catch (downloadError) {
+      console.error("Download failed:", downloadError)
+      setError({
+        message: "The MP3 could not be downloaded.",
+        suggestion: "Check your connection and try again.",
+      })
     }
   }
 
-  const handleCancel = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
-      setIsConverting(false)
-    }
+  function handleCancel() {
+    abortControllerRef.current?.abort()
   }
 
-  // Update the handleSubmit function
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
     setIsConverting(true)
-    setDownloadUrl('')
-    setVideoTitle('') // Reset title
+    setError(null)
+    const previousDownloadUrl = downloadUrl
 
     try {
-      abortControllerRef.current = new AbortController()
-      const response = await fetch('api/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: youtubeUrl }),
-        signal: abortControllerRef.current.signal
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+      const response = await fetch("/api/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: youtubeUrl.trim() }),
+        signal: controller.signal,
       })
+      const data = await response.json()
 
-      if (response.ok) {
-        const data = await response.json()
-        setDownloadUrl(data.downloadUrl)
-        setVideoTitle(data.videoTitle) // Set from response
-      } else {
-        console.error('Conversion failed')
+      if (!response.ok) {
+        setError(parseApiError(data))
+        return
       }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('Conversion cancelled')
+
+      setDownloadUrl(data.downloadUrl)
+      setVideoTitle(data.videoTitle)
+      if (previousDownloadUrl && previousDownloadUrl !== data.downloadUrl) {
+        deleteBlob(previousDownloadUrl).catch(console.error)
+      }
+    } catch (conversionError) {
+      if (conversionError instanceof Error && conversionError.name === "AbortError") {
+        setError({ message: "Conversion cancelled." })
       } else {
-        console.error('Error:', error)
+        console.error("Conversion request failed:", conversionError)
+        setError({
+          message: "The converter could not reach the backend.",
+          details: conversionError instanceof Error ? conversionError.message : undefined,
+          suggestion: "Check that the server is running and try again.",
+        })
       }
     } finally {
       setIsConverting(false)
@@ -118,135 +179,114 @@ export default function Home() {
     }
   }
 
-  // Add effect to cleanup on unmount
-  useEffect(() => {
-    // Cleanup function for page unload
-    const handleUnload = async () => {
-      if (downloadUrl) {
-        // Send sync request on unload
-        navigator.sendBeacon('/api/convert/cleanup', JSON.stringify({ url: downloadUrl }));
-      }
-    };
+  async function handleConvertAnother() {
+    const oldDownloadUrl = downloadUrl
+    setYoutubeUrl("")
+    setDownloadUrl("")
+    setVideoTitle("")
+    setError(null)
 
-    // Add unload listener
-    window.addEventListener('beforeunload', handleUnload);
-
-    // Cleanup on component unmount
-    return () => {
-      if (downloadUrl) {
-        deleteBlob(downloadUrl);
+    if (oldDownloadUrl) {
+      try {
+        await deleteBlob(oldDownloadUrl)
+      } catch (cleanupError) {
+        console.error("Temporary file cleanup failed:", cleanupError)
       }
-      window.removeEventListener('beforeunload', handleUnload);
-    };
-  }, [downloadUrl]);
-
-  // Add delete function
-  const deleteBlob = async (url: string) => {
-    try {
-      const response = await fetch('api/convert', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.details || 'Failed to delete blob');
-      }
-      
-      console.log('Blob deleted successfully:', url);
-    } catch (error) {
-      console.error('Failed to delete blob:', error);
     }
-  };
-
-  // Modify the Convert Another button click handler
-  const handleConvertAnother = async () => {
-    if (downloadUrl) {
-      await deleteBlob(downloadUrl);
-    }
-    setYoutubeUrl('');
-    setDownloadUrl('');
-    setVideoTitle(''); // Add this line
-  };
-
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white text-gray-950">
       <Header />
-      <main className="container mx-auto px-4 py-12">
-        <Card className="w-full max-w-md mx-auto shadow-xl border-green-100 border">
+      <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+        <Card className="mx-auto w-full max-w-lg border-green-100 shadow-xl">
           <CardHeader className="border-b border-green-100">
-            <CardTitle className="text-xl text-green-700">Convert Video</CardTitle>
+            <CardTitle className="text-xl text-green-800">Convert video</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4">
+              <label htmlFor="youtube-url" className="sr-only">YouTube video URL</label>
               <Input
-                type="text"
-                placeholder="Enter YouTube video URL"
+                id="youtube-url"
+                type="url"
+                inputMode="url"
+                autoComplete="url"
+                placeholder="https://www.youtube.com/watch?v=…"
                 value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
+                onChange={(event) => setYoutubeUrl(event.target.value)}
                 required
-                className="border-green-200 focus:ring-green-500 focus:border-green-500"
+                disabled={isConverting}
+                aria-describedby={error ? "conversion-error" : "conversion-help"}
+                className="border-green-200 focus-visible:border-green-600 focus-visible:ring-green-600"
               />
-              <div className="flex gap-2">
-                <Button 
-                  type="submit" 
-                  className="flex-1 bg-green-600 hover:bg-green-700 transition-colors" 
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  type="submit"
+                  className="min-h-11 flex-1 bg-green-700 text-white hover:bg-green-800"
                   disabled={isConverting}
                 >
                   {isConverting ? (
                     <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Converting...
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      Converting…
                     </span>
-                  ) : (
-                    "Convert to MP3"
-                  )}
+                  ) : "Convert to MP3"}
                 </Button>
-                {isConverting && (
-                  <Button 
+                {isConverting ? (
+                  <Button
                     type="button"
                     onClick={handleCancel}
-                    className="bg-red-600 hover:bg-red-700 transition-colors"
+                    className="min-h-11 bg-red-700 text-white hover:bg-red-800"
                   >
                     Cancel
                   </Button>
-                )}
+                ) : null}
               </div>
             </form>
-            {downloadUrl && (
-              <div className="mt-6 space-y-4">
-                <p className="text-center text-lg text-gray-800 font-semibold break-words">
-                  {videoTitle}
-                </p>
-                <div className="flex justify-center items-center gap-4">
-                  <a 
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      const filename = downloadUrl.split('/').pop()?.split('?')[0] || 'audio.mp3';
-                      downloadFile(downloadUrl, filename);
-                    }}
-                    className="inline-flex items-center space-x-2 text-green-600 hover:text-green-700 font-medium"
+
+            {error ? (
+              <div id="conversion-error" role="alert" className="mt-4 space-y-2 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-950">
+                <p className="font-semibold">{error.message}</p>
+                {error.details ? <p className="break-words">{error.details}</p> : null}
+                {error.suggestion ? <p><span className="font-medium">Try this:</span> {error.suggestion}</p> : null}
+                {error.code || error.requestId ? (
+                  <p className="break-all text-xs text-red-800">
+                    {error.code ? `Code: ${error.code}` : ""}
+                    {error.code && error.stage ? " · " : ""}
+                    {error.stage ? `Stage: ${error.stage}` : ""}
+                    {(error.code || error.stage) && error.requestId ? " · " : ""}
+                    {error.requestId ? `Request: ${error.requestId}` : ""}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {downloadUrl ? (
+              <section className="mt-6 space-y-4" aria-live="polite">
+                <p className="break-words text-center text-lg font-semibold text-gray-800">{videoTitle}</p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
+                  <Button
+                    type="button"
+                    onClick={downloadFile}
+                    variant="outline"
+                    className="min-h-11 border-green-200 text-green-800 hover:bg-green-50"
                   >
-                    <Music className="h-4 w-4" />
-                    <span>Download MP3</span>
-                  </a>
+                    <Music className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Download MP3
+                  </Button>
                   <Button
                     type="button"
                     onClick={() => setIsEditDialogOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 transition-colors text-sm"
+                    className="min-h-11 bg-blue-700 text-white hover:bg-blue-800"
                   >
-                    Edit MP3
+                    Edit metadata
                   </Button>
                   <Button
                     type="button"
                     onClick={handleConvertAnother}
-                    className="bg-green-600 hover:bg-green-700 transition-colors text-sm"
+                    className="min-h-11 bg-green-700 text-white hover:bg-green-800"
                   >
-                    Convert Another
+                    Convert another
                   </Button>
                 </div>
                 <EditDialog
@@ -254,17 +294,20 @@ export default function Home() {
                   onClose={() => setIsEditDialogOpen(false)}
                   initialFileName={videoTitle}
                   downloadUrl={downloadUrl}
-                  onUpdate={setDownloadUrl}
+                  onUpdate={(newUrl, newFileName) => {
+                    setDownloadUrl(newUrl)
+                    setVideoTitle(newFileName)
+                  }}
                 />
-              </div>
-            )}
+              </section>
+            ) : null}
           </CardContent>
-          
-          <CardFooter className="border-t border-green-100 justify-center">
-            <p className="text-sm text-gray-600">Enter a valid YouTube link to convert it to MP3</p>
+          <CardFooter className="border-t border-green-100 pt-6">
+            <p id="conversion-help" className="w-full text-center text-sm text-gray-600">
+              Enter a valid YouTube link to convert it to MP3.
+            </p>
           </CardFooter>
         </Card>
-
       </main>
     </div>
   )
