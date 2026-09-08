@@ -336,7 +336,6 @@ async function runConversion(job) {
       fileSize: result.fileSize || file.size,
     }
   } finally {
-    if (input.coverArtUrl) await Promise.allSettled([del(input.coverArtUrl)])
     await rm(directory, { recursive: true, force: true })
   }
 }
@@ -399,6 +398,7 @@ async function runEdit(job) {
       tracks: input.tracks,
     }
   } finally {
+    if (input.coverArtUrl) await Promise.allSettled([del(input.coverArtUrl)])
     await rm(directory, { recursive: true, force: true })
   }
 }
