@@ -21,6 +21,7 @@ class ConversionTests(unittest.TestCase):
             "HTTP Error 429: Too Many Requests": "YOUTUBE_RATE_LIMITED",
             "ffmpeg not found": "FFMPEG_UNAVAILABLE",
             "Unable to download API page": "YOUTUBE_NETWORK_ERROR",
+            "Playlist contains 51 tracks; the limit is 50": "PLAYLIST_TOO_LARGE",
         }
         for detail, expected_code in cases.items():
             with self.subTest(detail=detail):

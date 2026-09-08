@@ -28,7 +28,7 @@ export function isVercelBlobUrl(value: unknown): value is string {
   }
 }
 
-export function sanitizeFileName(value: FormDataEntryValue | null) {
+export function sanitizeFileName(value: unknown) {
   if (typeof value !== "string") return ""
   return value
     .normalize("NFKC")

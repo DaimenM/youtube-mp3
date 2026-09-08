@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react"
 import { Loader2, Music } from "lucide-react"
 import { Button } from "@/components/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/card"
-import { EditDialog } from "@/components/dialog"
+import { EditDialog, type TrackMetadata } from "@/components/dialog"
 import { Header } from "@/components/header"
 import { Input } from "@/components/input"
+import { JobClientError, waitForJob } from "@/lib/job-client"
 
 interface FilePickerWindow extends Window {
   showSaveFilePicker?: (options?: {
@@ -65,11 +66,15 @@ async function deleteBlob(url: string) {
 export default function Home() {
   const [youtubeUrl, setYoutubeUrl] = useState("")
   const [isConverting, setIsConverting] = useState(false)
+  const [conversionStatus, setConversionStatus] = useState("")
   const [downloadUrl, setDownloadUrl] = useState("")
   const [videoTitle, setVideoTitle] = useState("")
+  const [mediaType, setMediaType] = useState<"track" | "playlist">("track")
+  const [tracks, setTracks] = useState<TrackMetadata[]>([])
   const [error, setError] = useState<ConversionError | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const jobIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!downloadUrl) return
@@ -93,14 +98,18 @@ export default function Home() {
       const response = await fetch(downloadUrl)
       if (!response.ok) throw new Error("Download failed")
       const blob = await response.blob()
-      const fileName = `${safeDownloadName(videoTitle)}.mp3`
+      const extension = mediaType === "playlist" ? "zip" : "mp3"
+      const fileName = `${safeDownloadName(videoTitle)}.${extension}`
       const filePicker = (window as FilePickerWindow).showSaveFilePicker
 
       if (filePicker) {
         try {
           const handle = await filePicker({
             suggestedName: fileName,
-            types: [{
+            types: mediaType === "playlist" ? [{
+              description: "ZIP archive of MP3 files",
+              accept: { "application/zip": [".zip"] },
+            }] : [{
               description: "MP3 audio file",
               accept: { "audio/mpeg": [".mp3"] },
             }],
@@ -133,6 +142,10 @@ export default function Home() {
 
   function handleCancel() {
     abortControllerRef.current?.abort()
+    const jobId = jobIdRef.current
+    if (jobId) {
+      fetch(`/api/jobs/${encodeURIComponent(jobId)}`, { method: "DELETE", keepalive: true }).catch(console.error)
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -157,9 +170,20 @@ export default function Home() {
         return
       }
 
-      setDownloadUrl(data.downloadUrl)
-      setVideoTitle(data.videoTitle)
-      if (previousDownloadUrl && previousDownloadUrl !== data.downloadUrl) {
+      if (typeof data.jobId !== "string") throw new Error("The worker did not return a job ID.")
+      jobIdRef.current = data.jobId
+      const result = await waitForJob<{
+        downloadUrl: string
+        videoTitle: string
+        mediaType: "track" | "playlist"
+        tracks: TrackMetadata[]
+      }>(data.jobId, controller.signal, (message) => setConversionStatus(message))
+
+      setDownloadUrl(result.downloadUrl)
+      setVideoTitle(result.videoTitle)
+      setMediaType(result.mediaType === "playlist" ? "playlist" : "track")
+      setTracks(Array.isArray(result.tracks) ? result.tracks : [{ id: "track", title: result.videoTitle }])
+      if (previousDownloadUrl && previousDownloadUrl !== result.downloadUrl) {
         deleteBlob(previousDownloadUrl).catch(console.error)
       }
     } catch (conversionError) {
@@ -167,15 +191,24 @@ export default function Home() {
         setError({ message: "Conversion cancelled." })
       } else {
         console.error("Conversion request failed:", conversionError)
-        setError({
+        const failure = conversionError instanceof JobClientError ? conversionError.payload : null
+        setError(failure ? {
+          message: failure.message || "Conversion failed.",
+          code: failure.code,
+          stage: failure.stage,
+          details: failure.detail,
+          suggestion: failure.suggestion,
+        } : {
           message: "The converter could not reach the backend.",
           details: conversionError instanceof Error ? conversionError.message : undefined,
-          suggestion: "Check that the server is running and try again.",
+          suggestion: "Check that the worker is running and try again.",
         })
       }
     } finally {
       setIsConverting(false)
+      setConversionStatus("")
       abortControllerRef.current = null
+      jobIdRef.current = null
     }
   }
 
@@ -184,6 +217,8 @@ export default function Home() {
     setYoutubeUrl("")
     setDownloadUrl("")
     setVideoTitle("")
+    setMediaType("track")
+    setTracks([])
     setError(null)
 
     if (oldDownloadUrl) {
@@ -205,13 +240,13 @@ export default function Home() {
           </CardHeader>
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4">
-              <label htmlFor="youtube-url" className="sr-only">YouTube video URL</label>
+              <label htmlFor="youtube-url" className="sr-only">YouTube video or playlist URL</label>
               <Input
                 id="youtube-url"
                 type="url"
                 inputMode="url"
                 autoComplete="url"
-                placeholder="https://www.youtube.com/watch?v=…"
+                placeholder="Paste a YouTube video or playlist URL"
                 value={youtubeUrl}
                 onChange={(event) => setYoutubeUrl(event.target.value)}
                 required
@@ -228,7 +263,7 @@ export default function Home() {
                   {isConverting ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                      Converting…
+                      <span className="min-w-0 truncate">{conversionStatus || "Creating job…"}</span>
                     </span>
                   ) : "Convert to MP3"}
                 </Button>
@@ -263,7 +298,12 @@ export default function Home() {
 
             {downloadUrl ? (
               <section className="mt-6 space-y-4" aria-live="polite">
-                <p className="break-words text-center text-lg font-semibold text-gray-800">{videoTitle}</p>
+                <div className="text-center">
+                  <p className="break-words text-lg font-semibold text-gray-800">{videoTitle}</p>
+                  {mediaType === "playlist" ? (
+                    <p className="mt-1 text-sm text-gray-600">{tracks.length} MP3 files packaged as a ZIP archive</p>
+                  ) : null}
+                </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
                   <Button
                     type="button"
@@ -272,7 +312,7 @@ export default function Home() {
                     className="min-h-11 border-green-200 text-green-800 hover:bg-green-50"
                   >
                     <Music className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Download MP3
+                    Download {mediaType === "playlist" ? "playlist ZIP" : "MP3"}
                   </Button>
                   <Button
                     type="button"
@@ -289,22 +329,27 @@ export default function Home() {
                     Convert another
                   </Button>
                 </div>
-                <EditDialog
-                  isOpen={isEditDialogOpen}
-                  onClose={() => setIsEditDialogOpen(false)}
-                  initialFileName={videoTitle}
-                  downloadUrl={downloadUrl}
-                  onUpdate={(newUrl, newFileName) => {
-                    setDownloadUrl(newUrl)
-                    setVideoTitle(newFileName)
-                  }}
-                />
+                {isEditDialogOpen ? (
+                  <EditDialog
+                    isOpen
+                    onClose={() => setIsEditDialogOpen(false)}
+                    collectionName={videoTitle}
+                    mediaType={mediaType}
+                    initialTracks={tracks}
+                    downloadUrl={downloadUrl}
+                    onUpdate={(newUrl, newFileName, updatedTracks) => {
+                      setDownloadUrl(newUrl)
+                      setVideoTitle(newFileName)
+                      setTracks(updatedTracks)
+                    }}
+                  />
+                ) : null}
               </section>
             ) : null}
           </CardContent>
           <CardFooter className="border-t border-green-100 pt-6">
             <p id="conversion-help" className="w-full text-center text-sm text-gray-600">
-              Enter a valid YouTube link to convert it to MP3.
+              Enter a YouTube video or playlist link. Playlists download as a ZIP of MP3 files.
             </p>
           </CardFooter>
         </Card>

@@ -4,6 +4,7 @@ import re
 import sys
 import tempfile
 import unicodedata
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,12 @@ def classify_error(error: Exception) -> tuple[str, str, str]:
     detail = safe_detail(error)
     lower = detail.lower()
 
+    if "playlist contains" in lower and "limit is" in lower:
+        return (
+            "PLAYLIST_TOO_LARGE",
+            "This playlist contains more tracks than the server allows in one conversion.",
+            "Use a shorter playlist or increase MAX_PLAYLIST_TRACKS for this deployment.",
+        )
     if "my_cookies is invalid" in lower:
         return (
             "COOKIE_CONFIGURATION_INVALID",
@@ -186,20 +193,39 @@ def convert_to_mp3(url: str) -> bool:
             node_path = os.getenv("YTDLP_NODE_PATH")
             js_runtimes = {"node": {"path": node_path}} if node_path else {"node": {}}
 
-            options = {
-                "format": "bestaudio/best",
+            base_options = {
                 "quiet": True,
                 "no_warnings": False,
-                "noplaylist": True,
                 "socket_timeout": 30,
                 "retries": 5,
                 "extractor_retries": 3,
-                "fragment_retries": 5,
-                "concurrent_fragment_downloads": 4,
                 "cachedir": False,
-                "outtmpl": output_template,
                 "js_runtimes": js_runtimes,
                 "logger": ConversionLogger(),
+            }
+            if cookie_file:
+                base_options["cookiefile"] = cookie_file
+
+            emit_event("stage", stage="inspecting", message="Reading video or playlist details.")
+            with YoutubeDL({**base_options, "extract_flat": "in_playlist", "skip_download": True}) as inspector:
+                inspected_info = inspector.extract_info(url, download=False)
+
+            inspected_entries_value = inspected_info.get("entries") if isinstance(inspected_info, dict) else None
+            is_playlist = inspected_entries_value is not None
+            inspected_entries = list(inspected_entries_value) if is_playlist else []
+            max_playlist_tracks = max(1, int(os.getenv("MAX_PLAYLIST_TRACKS", "50")))
+            if is_playlist and len(inspected_entries) > max_playlist_tracks:
+                raise ValueError(
+                    f"Playlist contains {len(inspected_entries)} tracks; the configured limit is {max_playlist_tracks}."
+                )
+
+            options = {
+                **base_options,
+                "format": "bestaudio/best",
+                "fragment_retries": 5,
+                "concurrent_fragment_downloads": 4,
+                "outtmpl": output_template,
+                "noplaylist": not is_playlist,
                 "postprocessors": [
                     {
                         "key": "FFmpegExtractAudio",
@@ -208,31 +234,66 @@ def convert_to_mp3(url: str) -> bool:
                     }
                 ],
             }
-            if cookie_file:
-                options["cookiefile"] = cookie_file
-
-            emit_event("stage", stage="downloading", message="Downloading the best available audio stream.")
+            track_count = len(inspected_entries) if is_playlist else 1
+            emit_event(
+                "stage",
+                stage="downloading",
+                message=f"Downloading {track_count} audio track{'s' if track_count != 1 else ''}.",
+                trackCount=track_count,
+            )
             with YoutubeDL(options) as downloader:
                 info = downloader.extract_info(url, download=True)
 
-            video_id = info.get("id")
-            if not video_id:
-                raise ValueError("The video did not provide an ID")
+            raw_entries = info.get("entries") if is_playlist else [info]
+            entries = [entry for entry in raw_entries if isinstance(entry, dict)]
+            tracks = []
+            for index, entry in enumerate(entries, start=1):
+                video_id = entry.get("id")
+                if not video_id:
+                    raise ValueError(f"Track {index} did not provide a video ID")
+                mp3_path = os.path.join(temp_dir, f"{video_id}.mp3")
+                if not os.path.isfile(mp3_path):
+                    raise FileNotFoundError(f"FFmpeg did not produce MP3 output for track {index}")
+                tracks.append({
+                    "id": str(video_id),
+                    "title": clean_title(entry.get("title") or f"Track {index}"),
+                    "path": mp3_path,
+                })
 
-            mp3_path = os.path.join(temp_dir, f"{video_id}.mp3")
-            if not os.path.isfile(mp3_path):
-                raise FileNotFoundError("FFmpeg did not produce the expected MP3 output")
+            if not tracks:
+                raise ValueError("No downloadable tracks were found")
 
-            title = clean_title(info.get("title") or "audio")
-            file_size = os.path.getsize(mp3_path)
+            playlist_title = clean_title(info.get("title") or "YouTube playlist")
+            if is_playlist:
+                output_path = os.path.join(temp_dir, "playlist.zip")
+                with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_STORED) as archive:
+                    used_names = set()
+                    for track in tracks:
+                        archive_name = f"{track['title']}.mp3"
+                        if archive_name.casefold() in used_names:
+                            archive_name = f"{track['title']} [{track['id']}].mp3"
+                        used_names.add(archive_name.casefold())
+                        archive.write(track["path"], archive_name)
+                result_title = playlist_title
+                media_type = "playlist"
+                output_tracks = [{"id": track["id"], "title": track["title"]} for track in tracks]
+            else:
+                output_path = tracks[0]["path"]
+                result_title = tracks[0]["title"]
+                media_type = "track"
+                output_tracks = [{"id": tracks[0]["id"], "title": tracks[0]["title"]}]
+
+            file_size = os.path.getsize(output_path)
             emit_event(
                 "result",
-                title=title,
+                title=result_title,
+                mediaType=media_type,
+                tracks=output_tracks,
                 fileSize=file_size,
-                message="Audio conversion completed successfully.",
+                message=f"Converted {len(tracks)} track{'s' if len(tracks) != 1 else ''} successfully.",
             )
 
-            with open(mp3_path, "rb") as audio_file:
+            with open(output_path, "rb") as audio_file:
                 while chunk := audio_file.read(1024 * 1024):
                     sys.stdout.buffer.write(chunk)
             sys.stdout.buffer.flush()
