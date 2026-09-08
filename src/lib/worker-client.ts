@@ -1,4 +1,5 @@
-const WORKER_REQUEST_TIMEOUT_MS = 15_000
+// Render Free instances can take 50 seconds or more to wake from idle.
+const WORKER_REQUEST_TIMEOUT_MS = 90_000
 
 export class WorkerConfigurationError extends Error {}
 

@@ -89,6 +89,6 @@ Configure these variables on the worker:
 - `MAX_OUTPUT_BYTES` (default `209715200`)
 - Optional `MY_COOKIES` JSON when an authorized session is genuinely required
 
-The worker must be exposed over HTTPS. Its only unauthenticated endpoint is `GET /health`; job creation, status, editing, and cancellation require the bearer secret. Completed media is uploaded directly from the worker to Blob and never travels through a Vercel Function.
+The worker must be exposed over HTTPS. Its unauthenticated `GET /health` endpoint is a constant-time liveness check for the hosting platform, while `GET /ready` performs deeper Python, yt-dlp, Mutagen, FFmpeg, and secret-configuration checks. Job creation, status, editing, and cancellation require the bearer secret. Completed media is uploaded directly from the worker to Blob and never travels through a Vercel Function.
 
 Jobs are intentionally stored in the worker process for this first single-instance deployment. Restarting the worker invalidates in-flight job IDs. Before running multiple worker replicas, move job state and queueing to a shared service such as Redis.
